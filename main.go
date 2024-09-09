@@ -25,16 +25,26 @@ func main() {
 	// Initialize router
 	r := mux.NewRouter()
 
-	// Initialize user controller
+	// Initialize controllers
 	userController := controllers.NewUserController(db)
+	eventController := controllers.NewEventController(db)
+	espController := controllers.NewESPController(db)
 
 	// Protected routes
-	api := r.PathPrefix("/api").Subrouter()
+	api := r.PathPrefix("/api/v1").Subrouter()
 	api.Use(middleware.APIKeyAuth(db))
 	api.HandleFunc("/users", userController.GetUsers).Methods("GET")
 	api.HandleFunc("/users/{id}", userController.GetUser).Methods("GET")
 	api.HandleFunc("/users/{id}", userController.UpdateUser).Methods("PUT")
 	api.HandleFunc("/users/{id}", userController.DeleteUser).Methods("DELETE")
+
+	// Event routes
+	api.HandleFunc("/events", eventController.GetEvents).Methods("GET")
+	api.HandleFunc("/events/types", eventController.GetAvailableEventTypes).Methods("GET")
+	api.HandleFunc("/events/{type}", eventController.GetEventsByType).Methods("GET")
+
+	// ESP routes
+	api.HandleFunc("/esps", espController.GetESPs).Methods("GET")
 
 	// Start server
 	log.Println("Server is running on port 8081")
