@@ -19,29 +19,25 @@ func NewUserController(db *sql.DB) *UserController {
 	return &UserController{DB: db}
 }
 
-func (uc *UserController) CreateUser(w http.ResponseWriter, r *http.Request) {
-	var user models.User
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&user); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-
-	if err := models.CreateUser(uc.DB, &user); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
-}
+// controllers/user_controller.go
 
 func (uc *UserController) GetUser(w http.ResponseWriter, r *http.Request) {
+	authUser, ok := r.Context().Value("authUser").(*models.User)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check if the authenticated user is requesting their own data
+	if authUser.ID != id {
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -55,22 +51,23 @@ func (uc *UserController) GetUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
-func (uc *UserController) GetUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := models.GetUsers(uc.DB)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+func (uc *UserController) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	authUser, ok := r.Context().Value("authUser").(*models.User)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(users)
-}
-
-func (uc *UserController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check if the authenticated user is updating their own data
+	if authUser.ID != id {
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -93,10 +90,22 @@ func (uc *UserController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uc *UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	authUser, ok := r.Context().Value("authUser").(*models.User)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check if the authenticated user is deleting their own account
+	if authUser.ID != id {
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -106,4 +115,22 @@ func (uc *UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (uc *UserController) GetUsers(w http.ResponseWriter, r *http.Request) {
+	authUser, ok := r.Context().Value("authUser").(*models.User)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Instead of getting all users, just return the authenticated user
+	user, err := models.GetUser(uc.DB, authUser.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode([]*models.User{user}) // Wrap in array to maintain consistent response format
 }

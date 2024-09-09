@@ -77,3 +77,18 @@ func DeleteUser(db *sql.DB, id int) error {
 	_, err := db.Exec(query, id)
 	return err
 }
+
+// models/user.go
+// Add this function to the existing file
+
+func GetUserByAPIKey(db *sql.DB, apiKey string) (*User, error) {
+	user := &User{}
+	query := `SELECT * FROM users WHERE api_key = $1`
+	err := db.QueryRow(query, apiKey).Scan(
+		&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName,
+		&user.CreatedAt, &user.UpdatedAt, &user.APIKey)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
