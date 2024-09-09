@@ -10,6 +10,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/nzenitram/relay-esp/controllers"
 	"github.com/nzenitram/relay-esp/database"
+	"github.com/nzenitram/relay-esp/middleware"
 )
 
 func main() {
@@ -27,12 +28,13 @@ func main() {
 	// Initialize user controller
 	userController := controllers.NewUserController(db)
 
-	// Define routes
-	r.HandleFunc("/users", userController.CreateUser).Methods("POST")
-	r.HandleFunc("/users", userController.GetUsers).Methods("GET")
-	r.HandleFunc("/users/{id}", userController.GetUser).Methods("GET")
-	r.HandleFunc("/users/{id}", userController.UpdateUser).Methods("PUT")
-	r.HandleFunc("/users/{id}", userController.DeleteUser).Methods("DELETE")
+	// Protected routes
+	api := r.PathPrefix("/api").Subrouter()
+	api.Use(middleware.APIKeyAuth(db))
+	api.HandleFunc("/users", userController.GetUsers).Methods("GET")
+	api.HandleFunc("/users/{id}", userController.GetUser).Methods("GET")
+	api.HandleFunc("/users/{id}", userController.UpdateUser).Methods("PUT")
+	api.HandleFunc("/users/{id}", userController.DeleteUser).Methods("DELETE")
 
 	// Start server
 	log.Println("Server is running on port 8081")
