@@ -4,6 +4,7 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -158,24 +159,73 @@ func (ec *ESPController) GetUserEventStats(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	startTimeStr := r.URL.Query().Get("start_time")
-	endTimeStr := r.URL.Query().Get("end_time")
+	// Parse start and end times from query parameters
+	startTimeStr := r.URL.Query().Get("start_date")
+	endTimeStr := r.URL.Query().Get("end_date")
 
-	startTime, err := time.Parse(time.RFC3339, startTimeStr)
+	// Use a more user-friendly date format
+	const dateFormat = "2006-01-02"
+
+	startTime, err := time.Parse(dateFormat, startTimeStr)
 	if err != nil {
-		http.Error(w, "Invalid start_time", http.StatusBadRequest)
+		http.Error(w, "Invalid start_date format. Use YYYY-MM-DD", http.StatusBadRequest)
 		return
 	}
 
-	endTime, err := time.Parse(time.RFC3339, endTimeStr)
+	endTime, err := time.Parse(dateFormat, endTimeStr)
 	if err != nil {
-		http.Error(w, "Invalid end_time", http.StatusBadRequest)
+		http.Error(w, "Invalid end_date format. Use YYYY-MM-DD", http.StatusBadRequest)
 		return
 	}
+
+	// Set the end time to the end of the day
+	endTime = endTime.Add(24*time.Hour - time.Second)
 
 	stats, err := models.GetUserEventStats(ec.DB, authUser.ID, startTime, endTime)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}
+
+func (ec *ESPController) GetProviderEventStats(w http.ResponseWriter, r *http.Request) {
+	authUser, ok := r.Context().Value(middleware.AuthUserKey).(*models.User)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	providerName := vars["provider"]
+	if providerName == "" {
+		http.Error(w, "Provider name is required", http.StatusBadRequest)
+		return
+	}
+
+	startDateStr := r.URL.Query().Get("start_date")
+	endDateStr := r.URL.Query().Get("end_date")
+
+	startTime, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		http.Error(w, "Invalid start_date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		return
+	}
+
+	endTime, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		http.Error(w, "Invalid end_date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		return
+	}
+
+	// Set end time to the end of the day
+	endTime = endTime.Add(24*time.Hour - time.Second)
+
+	stats, err := models.GetProviderEventStats(ec.DB, authUser.ID, providerName, startTime, endTime)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error getting stats: %v", err), http.StatusInternalServerError)
 		return
 	}
 
