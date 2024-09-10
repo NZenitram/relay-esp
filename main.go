@@ -56,9 +56,12 @@ func main() {
 	api.HandleFunc("/esps", espController.CreateESP).Methods("POST")
 	api.HandleFunc("/esps/{id}", espController.UpdateESP).Methods("PUT")
 	api.HandleFunc("/esps/{id}", espController.DeleteESP).Methods("DELETE")
+	// ESP Stats
+	api.HandleFunc("/esps/{provider}/event-stats", espController.GetProviderEventStats).Methods("GET")
 
 	// User event routes
-	api.HandleFunc("/api/v1/event-stats", espController.GetUserEventStats).Methods("GET")
+	api.HandleFunc("/event-stats", espController.GetUserEventStats).Methods("GET")
+
 	// Start server
 	log.Println("Server is running on port 8081")
 	log.Fatal(http.ListenAndServe(":8081", r))
