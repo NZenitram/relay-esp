@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/nzenitram/relay-esp/middleware"
 	"github.com/nzenitram/relay-esp/models"
 	"github.com/nzenitram/relay-esp/utils"
 	"github.com/sendgrid/sendgrid-go"
@@ -96,7 +97,7 @@ func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uc *UserController) GetUser(w http.ResponseWriter, r *http.Request) {
-	authUser, ok := r.Context().Value("authUser").(*models.User)
+	authUser, ok := r.Context().Value(middleware.AuthUserKey).(*models.User)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -127,7 +128,7 @@ func (uc *UserController) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uc *UserController) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	authUser, ok := r.Context().Value("authUser").(*models.User)
+	authUser, ok := r.Context().Value(middleware.AuthUserKey).(*models.User)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -165,7 +166,7 @@ func (uc *UserController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uc *UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	authUser, ok := r.Context().Value("authUser").(*models.User)
+	authUser, ok := r.Context().Value(middleware.AuthUserKey).(*models.User)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -193,7 +194,7 @@ func (uc *UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uc *UserController) GetUsers(w http.ResponseWriter, r *http.Request) {
-	authUser, ok := r.Context().Value("authUser").(*models.User)
+	authUser, ok := r.Context().Value(middleware.AuthUserKey).(*models.User)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
