@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/nzenitram/relay-esp/middleware"
 	"github.com/nzenitram/relay-esp/models"
 )
 
@@ -20,7 +21,7 @@ func NewEventController(db *sql.DB) *EventController {
 }
 
 func (ec *EventController) GetEvents(w http.ResponseWriter, r *http.Request) {
-	authUser, ok := r.Context().Value("authUser").(*models.User)
+	authUser, ok := r.Context().Value(middleware.AuthUserKey).(*models.User)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -44,7 +45,7 @@ func (ec *EventController) GetEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ec *EventController) GetEventsByType(w http.ResponseWriter, r *http.Request) {
-	authUser, ok := r.Context().Value("authUser").(*models.User)
+	authUser, ok := r.Context().Value(middleware.AuthUserKey).(*models.User)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

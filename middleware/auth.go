@@ -11,34 +11,48 @@ import (
 	"github.com/nzenitram/relay-esp/utils"
 )
 
-func APIKeyAuth(db *sql.DB) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
-				return
-			}
+type contextKey string
 
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				http.Error(w, "Invalid Authorization header format", http.StatusUnauthorized)
-				return
-			}
+const (
+	AuthUserKey contextKey = "authUser"
+)
 
-			apiKey := parts[1]
-			user, err := models.GetUserByAPIKey(db, apiKey)
-			if err != nil {
-				http.Error(w, "Invalid API key", http.StatusUnauthorized)
-				return
-			}
+// func APIKeyAuth(db *sql.DB) func(http.Handler) http.Handler {
+// 	return func(next http.Handler) http.Handler {
+// 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 			authHeader := r.Header.Get("Authorization")
+// 			log.Printf("Auth Header: %s", authHeader)
 
-			// Add the authenticated user to the request context
-			ctx := context.WithValue(r.Context(), "authUser", user)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
+// 			if authHeader == "" {
+// 				log.Println("Missing Authorization header")
+// 				http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
+// 				return
+// 			}
+
+// 			parts := strings.Split(authHeader, " ")
+// 			if len(parts) != 2 || parts[0] != "Bearer" {
+// 				log.Printf("Invalid header format. Parts: %v", parts)
+// 				http.Error(w, "Invalid Authorization header format", http.StatusUnauthorized)
+// 				return
+// 			}
+
+// 			apiKey := parts[1]
+// 			log.Printf("Attempting to get user with API key: %s", apiKey)
+
+// 			user, err := models.GetUserByAPIKey(db, apiKey)
+// 			if err != nil {
+// 				log.Printf("Error getting user by API key: %v", err)
+// 				http.Error(w, "Invalid API key", http.StatusUnauthorized)
+// 				return
+// 			}
+
+// 			log.Printf("User authenticated: %s", user.Username)
+
+// 			ctx := context.WithValue(r.Context(), AuthUserKey, user)
+// 			next.ServeHTTP(w, r.WithContext(ctx))
+// 		})
+// 	}
+// }
 
 func JWTAuth(db *sql.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -67,7 +81,7 @@ func JWTAuth(db *sql.DB) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), "user", user)
+			ctx := context.WithValue(r.Context(), AuthUserKey, user)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
