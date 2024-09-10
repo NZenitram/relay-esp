@@ -4,12 +4,15 @@ package models
 import (
 	"database/sql"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
 	ID        int       `json:"id"`
 	Username  string    `json:"username"`
 	Email     string    `json:"email"`
+	Password  string    `json:"-"`
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
 	CreatedAt time.Time `json:"created_at"`
@@ -27,12 +30,19 @@ func CreateUser(db *sql.DB, user *User) error {
 		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 }
 
-func GetUser(db *sql.DB, id int) (*User, error) {
+func GetUserByID(db *sql.DB, id int) (*User, error) {
+	// err1 := ResetPassword(db, "bobmarley", "password123")
+	// if err1 != nil {
+	// 	log.Printf("Failed to reset password: %v", err1)
+	// } else {
+	// 	log.Println("Password reset successfully")
+	// }
+
 	user := &User{}
 	query := `SELECT * FROM users WHERE id = $1`
 	err := db.QueryRow(query, id).Scan(
 		&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName,
-		&user.CreatedAt, &user.UpdatedAt, &user.APIKey)
+		&user.CreatedAt, &user.UpdatedAt, &user.APIKey, &user.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -78,15 +88,36 @@ func DeleteUser(db *sql.DB, id int) error {
 	return err
 }
 
-// models/user.go
-// Add this function to the existing file
-
 func GetUserByAPIKey(db *sql.DB, apiKey string) (*User, error) {
 	user := &User{}
 	query := `SELECT * FROM users WHERE api_key = $1`
 	err := db.QueryRow(query, apiKey).Scan(
 		&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName,
-		&user.CreatedAt, &user.UpdatedAt, &user.APIKey)
+		&user.CreatedAt, &user.UpdatedAt, &user.APIKey, &user.Password)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (u *User) SetPassword(password string) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	u.Password = string(hashedPassword)
+	return nil
+}
+
+func (u *User) CheckPassword(password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
+	return err == nil
+}
+
+func GetUserByUsername(db *sql.DB, username string) (*User, error) {
+	user := &User{}
+	err := db.QueryRow("SELECT id, username, email, password, first_name, last_name, created_at, updated_at, api_key FROM users WHERE username = $1", username).
+		Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.FirstName, &user.LastName, &user.CreatedAt, &user.UpdatedAt, &user.APIKey)
 	if err != nil {
 		return nil, err
 	}
