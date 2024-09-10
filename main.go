@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/nzenitram/relay-esp/controllers"
 	"github.com/nzenitram/relay-esp/database"
@@ -15,10 +14,10 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("No .env file found, using system environment variables")
-	}
+	// err := godotenv.Load()
+	// if err != nil {
+	// 	log.Println("No .env file found, using system environment variables")
+	// }
 
 	// Connect to the database
 	database.InitDB()
@@ -50,6 +49,7 @@ func main() {
 	api.HandleFunc("/events", eventController.GetEvents).Methods("GET")
 	api.HandleFunc("/events/types", eventController.GetAvailableEventTypes).Methods("GET")
 	api.HandleFunc("/events/{type}", eventController.GetEventsByType).Methods("GET")
+	api.HandleFunc("/events/{provider}/{event}", eventController.GetProviderEventStatsByType).Methods("GET")
 
 	// ESP routes
 	api.HandleFunc("/esps", espController.GetESPs).Methods("GET")
