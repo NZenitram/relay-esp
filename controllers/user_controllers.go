@@ -49,7 +49,7 @@ func init() {
 
 func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) {
 	var loginData struct {
-		Username string `json:"username"`
+		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
@@ -59,14 +59,18 @@ func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := models.GetUserByUsername(uc.DB, loginData.Username)
+	user, err := models.GetUserByEmail(uc.DB, loginData.Email)
 	if err != nil {
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 		return
 	}
 
 	if !user.CheckPassword(loginData.Password) {
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
@@ -76,8 +80,19 @@ func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create a session
+	err = createSession(uc.DB, user.ID, token)
+	if err != nil {
+		http.Error(w, "Error creating session", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	json.NewEncoder(w).Encode(map[string]string{
+		"token":    token,
+		"email":    user.Email,
+		"username": user.Username,
+	})
 }
 
 func (uc *UserController) GetUser(w http.ResponseWriter, r *http.Request) {
@@ -329,4 +344,11 @@ func clearResetToken(db *sql.DB, email string) {
 func logPasswordChange(username string) {
 	log.Printf("Password changed successfully for user: %s", username)
 	// In a production environment, you might want to use a more robust logging system
+}
+
+func createSession(db *sql.DB, userID int, token string) error {
+	query := `INSERT INTO sessions (user_id, token, created_at, expires_at) 
+              VALUES ($1, $2, $3, $4)`
+	_, err := db.Exec(query, userID, token, time.Now(), time.Now().Add(24*time.Hour))
+	return err
 }

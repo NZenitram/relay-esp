@@ -22,27 +22,31 @@ type User struct {
 
 func CreateUser(db *sql.DB, user *User) error {
 	query := `
-        INSERT INTO users (username, email, first_name, last_name, api_key)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO users (username, email, first_name, last_name, api_key, password)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, created_at, updated_at`
 
 	return db.QueryRow(query, user.Username, user.Email, user.FirstName, user.LastName, user.APIKey).
 		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 }
 
-func GetUserByID(db *sql.DB, id int) (*User, error) {
-	// err1 := ResetPassword(db, "bobmarley", "password123")
-	// if err1 != nil {
-	// 	log.Printf("Failed to reset password: %v", err1)
-	// } else {
-	// 	log.Println("Password reset successfully")
-	// }
-
+func GetUserByEmail(db *sql.DB, email string) (*User, error) {
 	user := &User{}
-	query := `SELECT * FROM users WHERE id = $1`
+	query := `SELECT id, username, email, api_key 
+              FROM users WHERE email = $1`
+	err := db.QueryRow(query, email).Scan(
+		&user.ID, &user.Username, &user.Email, &user.APIKey)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func GetUserByID(db *sql.DB, id int) (*User, error) {
+	user := &User{}
+	query := `SELECT id, username, email, api_key FROM users WHERE id = $1`
 	err := db.QueryRow(query, id).Scan(
-		&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName,
-		&user.CreatedAt, &user.UpdatedAt, &user.APIKey, &user.Password)
+		&user.ID, &user.Username, &user.Email, &user.APIKey)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +54,7 @@ func GetUserByID(db *sql.DB, id int) (*User, error) {
 }
 
 func GetUsers(db *sql.DB) ([]*User, error) {
-	query := `SELECT * FROM users`
+	query := `SELECT SELECT id, username, email, api_key FROM users`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -61,8 +65,7 @@ func GetUsers(db *sql.DB) ([]*User, error) {
 	for rows.Next() {
 		user := &User{}
 		err := rows.Scan(
-			&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName,
-			&user.CreatedAt, &user.UpdatedAt, &user.APIKey)
+			&user.ID, &user.Username, &user.Email, &user.APIKey)
 		if err != nil {
 			return nil, err
 		}
@@ -90,10 +93,9 @@ func DeleteUser(db *sql.DB, id int) error {
 
 func GetUserByAPIKey(db *sql.DB, apiKey string) (*User, error) {
 	user := &User{}
-	query := `SELECT * FROM users WHERE api_key = $1`
+	query := `SELECT id, username, email, api_key FROM users WHERE api_key = $1`
 	err := db.QueryRow(query, apiKey).Scan(
-		&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName,
-		&user.CreatedAt, &user.UpdatedAt, &user.APIKey, &user.Password)
+		&user.ID, &user.Username, &user.Email, &user.APIKey)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +118,8 @@ func (u *User) CheckPassword(password string) bool {
 
 func GetUserByUsername(db *sql.DB, username string) (*User, error) {
 	user := &User{}
-	err := db.QueryRow("SELECT id, username, email, password, first_name, last_name, created_at, updated_at, api_key FROM users WHERE username = $1", username).
-		Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.FirstName, &user.LastName, &user.CreatedAt, &user.UpdatedAt, &user.APIKey)
+	err := db.QueryRow("SELECT id, username, email, api_key FROM users WHERE username = $1", username).
+		Scan(&user.ID, &user.Username, &user.Email, &user.APIKey)
 	if err != nil {
 		return nil, err
 	}
