@@ -35,9 +35,6 @@ func main() {
 	r.HandleFunc("/request-password-reset", userController.RequestPasswordReset).Methods("POST")
 	r.HandleFunc("/reset-password", userController.ResetPassword).Methods("POST")
 
-	// User event routes
-	// api.HandleFunc("/api/v1/user/event-stats", espController.GetUserEventStats).Methods("GET")
-
 	// Protected routes
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.Use(middleware.JWTAuth(db))
@@ -57,6 +54,8 @@ func main() {
 	api.HandleFunc("/esps/{id}", espController.UpdateESP).Methods("PUT")
 	api.HandleFunc("/esps/{id}", espController.DeleteESP).Methods("DELETE")
 
+	// User event routes
+	api.HandleFunc("/api/v1/event-stats", espController.GetUserEventStats).Methods("GET")
 	// Start server
 	log.Println("Server is running on port 8081")
 	log.Fatal(http.ListenAndServe(":8081", r))
