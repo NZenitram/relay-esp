@@ -367,3 +367,74 @@ func GetProviderEventStats(db *sql.DB, userID int, providerName string, startTim
 
 	return stats, nil
 }
+
+type ProviderEventStats struct {
+	Provider string    `json:"provider"`
+	Event    string    `json:"event"`
+	Data     [][]int64 `json:"data"` // [timestamp, count]
+}
+
+func GetProviderEventStatsByType(db *sql.DB, userID int, providerName, eventType string, startTime, endTime time.Time) (ProviderEventStats, error) {
+	query := `
+    SELECT 
+        DATE_TRUNC('day', TO_TIMESTAMP(COALESCE(e.processed_time, e.delivered_time, e.bounce_time, 
+                                  e.last_deferral_time, e.unique_open_time, e.last_open_time, 
+                                  e.dropped_time, 0))) AS event_date,
+        COUNT(*) AS event_count
+    FROM 
+        events e
+    JOIN 
+        message_user_associations mua ON e.message_id = mua.message_id
+    JOIN 
+        email_service_providers esp ON mua.esp_id = esp.esp_id
+    WHERE 
+        esp.user_id = $1
+        AND esp.provider_name = $2
+        AND e.%s = TRUE
+        AND (
+            (e.processed_time BETWEEN $3 AND $4) OR
+            (e.delivered_time BETWEEN $3 AND $4) OR
+            (e.bounce_time BETWEEN $3 AND $4) OR
+            (e.last_deferral_time BETWEEN $3 AND $4) OR
+            (e.unique_open_time BETWEEN $3 AND $4) OR
+            (e.last_open_time BETWEEN $3 AND $4) OR
+            (e.dropped_time BETWEEN $3 AND $4)
+        )
+    GROUP BY 
+        event_date
+    ORDER BY 
+        event_date
+    `
+
+	// Safely insert the event type into the query
+	query = fmt.Sprintf(query, eventType)
+
+	rows, err := db.Query(query, userID, providerName, startTime.Unix(), endTime.Unix())
+	if err != nil {
+		return ProviderEventStats{}, fmt.Errorf("query error: %v", err)
+	}
+	defer rows.Close()
+
+	stats := ProviderEventStats{
+		Provider: providerName,
+		Event:    eventType,
+	}
+
+	for rows.Next() {
+		var (
+			eventDate  time.Time
+			eventCount int64
+		)
+		if err := rows.Scan(&eventDate, &eventCount); err != nil {
+			return ProviderEventStats{}, fmt.Errorf("row scan error: %v", err)
+		}
+		timestamp := eventDate.Unix() * 1000 // Convert to milliseconds for Highcharts
+		stats.Data = append(stats.Data, []int64{timestamp, eventCount})
+	}
+
+	if err = rows.Err(); err != nil {
+		return ProviderEventStats{}, fmt.Errorf("rows error: %v", err)
+	}
+
+	return stats, nil
+}
