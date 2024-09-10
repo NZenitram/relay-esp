@@ -30,6 +30,11 @@ func main() {
 	eventController := controllers.NewEventController(db)
 	espController := controllers.NewESPController(db)
 
+	// Public routes
+	r.HandleFunc("/login", userController.Login).Methods("POST")
+	r.HandleFunc("/request-password-reset", userController.RequestPasswordReset).Methods("POST")
+	r.HandleFunc("/reset-password", userController.ResetPassword).Methods("POST")
+
 	// Protected routes
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.Use(middleware.APIKeyAuth(db))
