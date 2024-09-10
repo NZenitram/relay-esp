@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -18,6 +19,7 @@ func main() {
 	if err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
+
 	// Connect to the database
 	database.InitDB()
 	db := database.GetDB()
@@ -31,6 +33,7 @@ func main() {
 	espController := controllers.NewESPController(db)
 
 	// Public routes
+	r.HandleFunc("/health", HealthCheck).Methods("GET")
 	r.HandleFunc("/login", userController.Login).Methods("POST")
 	r.HandleFunc("/request-password-reset", userController.RequestPasswordReset).Methods("POST")
 	r.HandleFunc("/reset-password", userController.ResetPassword).Methods("POST")
@@ -53,10 +56,41 @@ func main() {
 	api.HandleFunc("/esps", espController.CreateESP).Methods("POST")
 	api.HandleFunc("/esps/{id}", espController.UpdateESP).Methods("PUT")
 	api.HandleFunc("/esps/{id}", espController.DeleteESP).Methods("DELETE")
+	// ESP Stats
+	api.HandleFunc("/esps/{provider}/event-stats", espController.GetProviderEventStats).Methods("GET")
 
 	// User event routes
-	api.HandleFunc("/api/v1/event-stats", espController.GetUserEventStats).Methods("GET")
+	api.HandleFunc("/event-stats", espController.GetUserEventStats).Methods("GET")
+
 	// Start server
 	log.Println("Server is running on port 8081")
 	log.Fatal(http.ListenAndServe(":8081", r))
+}
+
+func HealthCheck(w http.ResponseWriter, r *http.Request) {
+	health := struct {
+		Status   string `json:"status"`
+		Database string `json:"database"`
+	}{
+		Status:   "healthy",
+		Database: "connected",
+	}
+
+	database.InitDB()
+	db := database.GetDB()
+
+	// Check database connection
+	err := db.Ping()
+	if err != nil {
+		health.Status = "unhealthy"
+		health.Database = "disconnected"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if health.Status == "healthy" {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	json.NewEncoder(w).Encode(health)
 }
