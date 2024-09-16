@@ -22,6 +22,7 @@ func main() {
 	// Connect to the database
 	database.InitDB()
 	db := database.GetDB()
+	defer database.CloseDB()
 
 	// Initialize router
 	r := mux.NewRouter()
@@ -78,6 +79,7 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 
 	database.InitDB()
 	db := database.GetDB()
+	defer database.CloseDB()
 
 	// Check database connection
 	err := db.Ping()
