@@ -374,67 +374,65 @@ type ProviderEventStats struct {
 	Data     [][]int64 `json:"data"` // [timestamp, count]
 }
 
-func GetProviderEventStatsByType(db *sql.DB, userID int, providerName, eventType string, startTime, endTime time.Time) (ProviderEventStats, error) {
-	query := `
-    SELECT 
-        DATE_TRUNC('day', TO_TIMESTAMP(COALESCE(e.processed_time, e.delivered_time, e.bounce_time, 
-                                  e.last_deferral_time, e.unique_open_time, e.last_open_time, 
-                                  e.dropped_time, 0))) AS event_date,
-        COUNT(*) AS event_count
-    FROM 
-        events e
-    JOIN 
-        message_user_associations mua ON e.message_id = mua.message_id
-    JOIN 
-        email_service_providers esp ON mua.esp_id = esp.esp_id
-    WHERE 
-        esp.user_id = $1
-        AND esp.provider_name = $2
-        AND e.%s = TRUE
-        AND (
-            (e.processed_time BETWEEN $3 AND $4) OR
-            (e.delivered_time BETWEEN $3 AND $4) OR
-            (e.bounce_time BETWEEN $3 AND $4) OR
-            (e.last_deferral_time BETWEEN $3 AND $4) OR
-            (e.unique_open_time BETWEEN $3 AND $4) OR
-            (e.last_open_time BETWEEN $3 AND $4) OR
-            (e.dropped_time BETWEEN $3 AND $4)
-        )
-    GROUP BY 
-        event_date
-    ORDER BY 
-        event_date
-    `
+func GetProviderEventStatsByType(db *sql.DB, userID int, providerName, eventType string, startTime, endTime time.Time, timeBucket string) (map[string]interface{}, error) {
+	// Define the event types and their corresponding tables
+	eventTables := map[string]string{
+		"processed": "processed_events",
+		"delivered": "delivered_events",
+		"bounce":    "bounce_events",
+		"deferred":  "deferred_events",
+		"open":      "open_events",
+		"dropped":   "dropped_events",
+	}
 
-	// Safely insert the event type into the query
-	query = fmt.Sprintf(query, eventType)
+	tableName, ok := eventTables[eventType]
+	if !ok {
+		return nil, fmt.Errorf("invalid event type: %s", eventType)
+	}
 
-	rows, err := db.Query(query, userID, providerName, startTime.Unix(), endTime.Unix())
+	query := fmt.Sprintf(`
+        SELECT time_bucket($1, time) AS bucket,
+               COUNT(DISTINCT message_id) AS count
+        FROM %s
+        WHERE user_id = $2 AND provider = $3 AND time BETWEEN $4 AND $5
+        GROUP BY bucket
+        ORDER BY bucket
+    `, tableName)
+
+	rows, err := db.Query(query, timeBucket, userID, providerName, startTime, endTime)
 	if err != nil {
-		return ProviderEventStats{}, fmt.Errorf("query error: %v", err)
+		return nil, fmt.Errorf("query error for %s: %v", eventType, err)
 	}
 	defer rows.Close()
 
-	stats := ProviderEventStats{
-		Provider: providerName,
-		Event:    eventType,
+	result := map[string]interface{}{
+		"labels": []string{},
+		"datasets": []map[string]interface{}{
+			{
+				"label": eventType,
+				"data":  []int{},
+			},
+		},
 	}
 
 	for rows.Next() {
-		var (
-			eventDate  time.Time
-			eventCount int64
-		)
-		if err := rows.Scan(&eventDate, &eventCount); err != nil {
-			return ProviderEventStats{}, fmt.Errorf("row scan error: %v", err)
+		var bucket time.Time
+		var count int
+		err := rows.Scan(&bucket, &count)
+		if err != nil {
+			return nil, fmt.Errorf("row scan error for %s: %v", eventType, err)
 		}
-		timestamp := eventDate.Unix() * 1000 // Convert to milliseconds for Highcharts
-		stats.Data = append(stats.Data, []int64{timestamp, eventCount})
+
+		result["labels"] = append(result["labels"].([]string), bucket.Format("2006-01-02 15:04:05"))
+		result["datasets"].([]map[string]interface{})[0]["data"] = append(
+			result["datasets"].([]map[string]interface{})[0]["data"].([]int),
+			count,
+		)
 	}
 
 	if err = rows.Err(); err != nil {
-		return ProviderEventStats{}, fmt.Errorf("rows error: %v", err)
+		return nil, fmt.Errorf("rows error for %s: %v", eventType, err)
 	}
 
-	return stats, nil
+	return result, nil
 }
