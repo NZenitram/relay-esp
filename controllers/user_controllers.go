@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	"github.com/nzenitram/relay-esp/middleware"
 	"github.com/nzenitram/relay-esp/models"
 	"github.com/nzenitram/relay-esp/utils"
@@ -35,10 +36,10 @@ func NewUserController(db *sql.DB) *UserController {
 
 func init() {
 	// Load .env file
-	// err := godotenv.Load()
-	// if err != nil {
-	// 	log.Fatal("Error loading .env file")
-	// }
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 
 	// Get SendGrid API key from environment variable
 	sendgridAPIKey = os.Getenv("SENDGRID_API_KEY")
